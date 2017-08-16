@@ -13,6 +13,7 @@ def read_conf():
     ftp_path = ''
     root_dir = ''
     keep_update_dirs = ''
+    exclude_dirs = ''
     try:
         with open('updateftp.conf', 'r') as file:
             for line in file.readlines():
@@ -31,6 +32,8 @@ def read_conf():
                     ftp_path = line.split('=')[1].strip()
                 elif line.split('=')[0].strip() == 'update_dirs':
                     keep_update_dirs = line.split('=')[1].strip()
+                elif line.split('=')[0].strip() == 'exclude_dirs':
+                    exclude_dirs = line.split('=')[1].strip()
                 elif line.split('=')[0].strip() == 'root_dir':
                     root_dir = line.split('=')[1].strip()
                 else:
@@ -42,7 +45,7 @@ def read_conf():
         print('user.conf is a error format. \n')
         exit(0)
     else:
-        return ftp_host, ftp_name, ftp_pwd, ftp_path, keep_update_dirs, root_dir
+        return ftp_host, ftp_name, ftp_pwd, ftp_path, keep_update_dirs, exclude_dirs, root_dir
 
 
 def get_mtime(file_path):
@@ -57,7 +60,7 @@ def get_mtime(file_path):
     return dt
 
 def autoupdateftp():
-    ftp_host, ftp_name, ftp_pwd, ftp_path, keep_update_dirs, root_dir = read_conf()
+    ftp_host, ftp_name, ftp_pwd, ftp_path, keep_update_dirs, exclude_dirs, root_dir = read_conf()
     from ftputil import FTPHost
     from ftputil.error import FTPError
     from ftputil.error import TemporaryError
@@ -75,7 +78,10 @@ def autoupdateftp():
         exit(0)
     import os
     if keep_update_dirs == '/':
-        download_file(ftp_s, keep_update_dirs, root_dir)
+        if exclude_dirs != '':
+            download_file(ftp_s, keep_update_dirs, root_dir, exclude_dirs)
+        else:
+            download_file(ftp_s, keep_update_dirs, root_dir)
     else:
         sdirs = keep_update_dirs.split(',')
         for dir in sdirs:
@@ -84,14 +90,17 @@ def autoupdateftp():
     ftp_s.close()
 
 
-def download_file(ftp_s, sdir, tdir):
+def download_file(ftp_s, sdir, tdir, edir=''):
     names = ftp_s.listdir(sdir)
+    if edir != '':
+        names = set(names) - set(edir.split(','))
     for name in names:
         name_c = name.encode('ISO 8859-1').decode('gbk')
         if sdir == '/':
             sdir_a = sdir + name
         else:
             sdir_a = sdir + '/' + name
+        print('Scanning the '+ sdir + '/' + name_c + ' ...')
         if ftp_s.path.isdir(sdir_a):
             import os
             if not os.path.exists(tdir+os.sep+name_c):
